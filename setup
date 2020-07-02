@@ -1,0 +1,49 @@
+#!/usr/bin/env python3
+
+import os
+
+
+def exec(cmd):
+    cmd = f"cd {os.path.dirname(os.path.abspath(__file__))} ; {cmd}"
+    os.system(cmd)
+
+
+exec("rm -rf ./pyrobolearn")
+exec("git clone https://github.com/robotlearn/pyrobolearn.git")
+exec("cd pyrobolearn ; git checkout 1850de55782b474e1e16529a2f782eced48e4aa0")
+
+
+def patch_pyrobolearn(filepath: str, old: str, new: str):
+    with open(os.path.join("pyrobolearn", filepath), "r") as f:
+        old_f_cont = f.read()
+    new_f_cont = old_f_cont.replace(old, new)
+    with open(os.path.join("pyrobolearn", filepath), "w") as f:
+        f.write(new_f_cont)
+
+
+patch_pyrobolearn("requirements.txt", "pybullet>=2.4.1", "pybullet==2.5.8")
+patch_pyrobolearn(
+    "setup.py",
+    "reqs = [str(ir.req) for ir in install_requires]",
+    "reqs = [str(ir.requirement) for ir in install_requires]",
+)
+patch_pyrobolearn(
+    "pyrobolearn/robots/robot.py",
+    """
+        if urdf[-3:] == 'xml' or urdf[-4:] == 'mjcf':
+            self.id = self.sim.load_mjcf(urdf)[0]  # assume the first entity is the robot
+    """,
+    """
+        if urdf[-3:] == 'xml' or urdf[-4:] == 'mjcf':
+            self.id = self.sim.load_mjcf(urdf)[0]  # assume the first entity is the robot
+        elif urdf[-4:] == '.sdf':
+            self.id = self.sim.load_sdf(urdf, scaling=scale)[0]
+    """,
+)
+
+
+exec("rm -rf ./venv")
+exec("virtualenv -p /usr/bin/python3 ./venv")
+exec(". ./venv/bin/activate ; pip3 install numpy cython ; pip3 install gpytorch")
+exec(". ./venv/bin/activate ; cd pyrobolearn ; pip3 install -e .")
+exec(". ./venv/bin/activate ; pip3 install kornia")
